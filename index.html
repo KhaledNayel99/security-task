@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cipher Tool</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f3ead9;--panel:#fbf6ea;--ink:#3a1420;--mute:#7a5a60;--line:#d8c7a8;--acc:#7b1e35;--acc-ink:#fbf3e4;--err:#a3162f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#2a0f18;--panel:#3a1824;--ink:#f3e6cf;--mute:#c9aa9a;--line:#5c2a3a;--acc:#e8d4ab;--acc-ink:#4a1222;--err:#ff8fa0}}
+:root[data-theme="dark"]{--bg:#2a0f18;--panel:#3a1824;--ink:#f3e6cf;--mute:#c9aa9a;--line:#5c2a3a;--acc:#e8d4ab;--acc-ink:#4a1222;--err:#ff8fa0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.6}
+main{max-width:640px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:1.6rem;margin:0 0 4px}
+p.sub{margin:0 0 20px;color:var(--mute)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.seg{display:flex;border:1px solid var(--acc);border-radius:10px;overflow:hidden}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{flex:1;text-align:center;padding:10px 6px;cursor:pointer;font-weight:700;color:var(--acc)}
+.seg input:checked+label{background:var(--acc);color:var(--acc-ink)}
+.seg input:focus-visible+label{outline:2px solid var(--ink);outline-offset:-3px}
+.title{font-weight:700;margin:0 0 8px}
+textarea,input[type=text],input[type=number]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:110px;resize:vertical}
+textarea:focus,input:focus{outline:2px solid var(--acc);outline-offset:1px}
+.hint{font-size:.85rem;color:var(--mute);margin:6px 0 0}
+.row{display:flex;gap:8px}
+button{flex:1;padding:11px;border-radius:8px;border:1px solid var(--acc);background:transparent;color:var(--acc);font:inherit;font-weight:700;cursor:pointer}
+button.main{background:var(--acc);color:var(--acc-ink)}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.err{color:var(--err);min-height:1.4em;margin:0 0 8px;font-size:.9rem}
+[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Cipher Tool</h1>
+<p class="sub">Pick an algorithm and a mode, type your text, and the result appears below.</p>
+
+<div class="panel">
+  <p class="title">Algorithm</p>
+  <div class="seg">
+    <input type="radio" name="algo" id="a1" value="caesar" checked><label for="a1">Caesar Cipher</label>
+    <input type="radio" name="algo" id="a2" value="vigenere"><label for="a2">Vigenère Cipher</label>
+  </div>
+  <p class="title" style="margin-top:14px">Mode</p>
+  <div class="seg">
+    <input type="radio" name="mode" id="m1" value="enc" checked><label for="m1">Encrypt</label>
+    <input type="radio" name="mode" id="m2" value="dec"><label for="m2">Decrypt</label>
+  </div>
+  <div id="shiftBox" style="margin-top:14px">
+    <label class="title" for="shift" style="display:block">Shift</label>
+    <input type="number" id="shift" value="3" min="-25" max="25">
+  </div>
+  <div id="keyBox" style="margin-top:14px" hidden>
+    <label class="title" for="key" style="display:block">Key</label>
+    <input type="text" id="key" placeholder="KEY" autocomplete="off">
+    <p class="hint">English letters only.</p>
+  </div>
+</div>
+
+<div class="panel">
+  <label class="title" for="inp" style="display:block">Input text</label>
+  <textarea id="inp" placeholder="Type or paste your text here..."></textarea>
+  <p class="hint">Only English letters are changed. Numbers and symbols stay as they are.</p>
+</div>
+
+<p class="err" id="err" role="alert"></p>
+<div class="row" style="margin-bottom:14px">
+  <button type="button" class="main" id="run">Run</button>
+  <button type="button" id="swap">Use output as input</button>
+</div>
+
+<div class="panel">
+  <label class="title" for="out" style="display:block">Output</label>
+  <textarea id="out" readonly></textarea>
+  <div class="row" style="margin-top:8px"><button type="button" class="main" id="copy">Copy</button><button type="button" class="main" id="clear">Clear</button></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const shiftCh=(c,s)=>{
+  const code=c.charCodeAt(0);
+  const base=code>=65&&code<=90?65:code>=97&&code<=122?97:0;
+  if(!base)return c;
+  return String.fromCharCode((((code-base+s)%26)+26)%26+base);
+};
+function caesar(t,s,dec){s=dec?-s:s;return [...t].map(c=>shiftCh(c,s)).join('')}
+function vigenere(t,key,dec){
+  const k=key.toUpperCase().replace(/[^A-Z]/g,'');
+  let i=0;
+  return [...t].map(c=>{
+    if(!/[A-Za-z]/.test(c))return c;
+    const s=k.charCodeAt(i++%k.length)-65;
+    return shiftCh(c,dec?-s:s);
+  }).join('');
+}
+function toggle(){
+  const v=document.querySelector('[name=algo]:checked').value==='vigenere';
+  $('shiftBox').hidden=v;$('keyBox').hidden=!v;
+}
+function run(){
+  $('err').textContent='';
+  const algo=document.querySelector('[name=algo]:checked').value;
+  const dec=document.querySelector('[name=mode]:checked').value==='dec';
+  const t=$('inp').value;
+  try{
+    if(algo==='caesar'){
+      const s=parseInt($('shift').value,10);
+      if(isNaN(s)){$('err').textContent='Enter a whole number for the shift.';return}
+      $('out').value=caesar(t,s,dec);
+    }else{
+      if(!/[A-Za-z]/.test($('key').value)){$('err').textContent='Enter a key with at least one English letter.';return}
+      $('out').value=vigenere(t,$('key').value,dec);
+    }
+  }catch(e){$('err').textContent='Something went wrong while processing the text.'}
+}
+document.querySelectorAll('[name=algo]').forEach(r=>r.onchange=()=>{toggle();run()});
+document.querySelectorAll('[name=mode]').forEach(r=>r.onchange=run);
+['inp','shift','key'].forEach(id=>$(id).addEventListener('input',run));
+$('run').onclick=run;
+$('swap').onclick=()=>{$('inp').value=$('out').value;$('out').value=''};
+$('clear').onclick=()=>{$('inp').value='';$('out').value='';$('err').textContent='';$('inp').focus()};
+function flash(b,txt,orig){b.textContent=txt;setTimeout(()=>b.textContent=orig,1200)}
+$('copy').onclick=async()=>{
+  const b=$('copy'),text=$('out').value;
+  if(!text){flash(b,'Nothing to copy','Copy');return}
+  let ok=false;
+  try{await navigator.clipboard.writeText(text);ok=true}catch(e){}
+  if(!ok){
+    const ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.focus();ta.select();ta.setSelectionRange(0,text.length);
+    try{ok=document.execCommand('copy')}catch(e){}
+    ta.remove();
+  }
+  flash(b,ok?'Copied':'Copy failed','Copy');
+};
+toggle();
+</script>
+</body>
+</html>
